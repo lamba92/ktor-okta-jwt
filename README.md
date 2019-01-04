@@ -49,7 +49,7 @@ Then import the latest version in the `build.gradle` of the modules you need:
 
 ```
 dependencies {
-    implementation 'com.github.lamba92:ktor-spa:{latest_version}'
+    implementation 'com.github.lamba92:ktor-okta-jwt:{latest_version}'
 }
 ```
 
@@ -60,7 +60,7 @@ repositories {
 }
 ...
 dependencies {
-    implementation("com.github.lamba92", "ktor-spa", "{latest_version}")
+    implementation("com.github.lamba92", "ktor-okta-jwt", "{latest_version}")
 }
 ```
 For Maven:
@@ -74,7 +74,7 @@ For Maven:
 ...
 <dependency> 	 
    <groupId>com.github.Lamba92</groupId>
-   <artifactId>ktor-spa</artifactId>
+   <artifactId>ktor-okta-jwt</artifactId>
    <version>{latest_version}</version>
 </dependency>
 ```
