@@ -1,1 +1,1 @@
-rootProject.name = "ktor-okta-auth"
+rootProject.name = "ktor-okta-jwt"
