@@ -1,4 +1,4 @@
-# Okta Jwt verifier for Ktor
+# Okta JWT verifier for Ktor [![Build Status](https://travis-ci.org/lamba92/ktor-okta-jwt.svg?branch=master)](https://travis-ci.org/lamba92/ktor-okta-jwt) [![](https://jitpack.io/v/lamba92/ktor-okta-jwt.svg)](https://jitpack.io/#lamba92/ktor-okta-jwt)
 
 Implementation of the authentication feature for the Okta JWT verifier. 
 
@@ -35,3 +35,46 @@ routing {
     }
 }
 ``` 
+
+## Install [![](https://jitpack.io/v/lamba92/ktor-okta-jwt.svg)](https://jitpack.io/#lamba92/ktor-okta-jwt)
+
+Add the [JitPack.io](http://jitpack.io) repository to the project `build.grade`:
+```
+repositories {
+    maven { url 'https://jitpack.io' }
+}
+```
+
+Then import the latest version in the `build.gradle` of the modules you need:
+
+```
+dependencies {
+    implementation 'com.github.lamba92:ktor-spa:{latest_version}'
+}
+```
+
+If using Gradle Kotlin DSL:
+```
+repositories {
+    maven(url = "https://jitpack.io")
+}
+...
+dependencies {
+    implementation("com.github.lamba92", "ktor-spa", "{latest_version}")
+}
+```
+For Maven:
+```
+<repositories>
+   <repository>
+      <id>jitpack.io</id>
+      <url>https://jitpack.io</url>
+   </repository>
+</repositories>
+...
+<dependency> 	 
+   <groupId>com.github.Lamba92</groupId>
+   <artifactId>ktor-spa</artifactId>
+   <version>{latest_version}</version>
+</dependency>
+```
