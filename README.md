@@ -34,7 +34,7 @@ routing {
 ## Install [![](https://jitpack.io/v/lamba92/ktor-okta-jwt.svg)](https://jitpack.io/#lamba92/ktor-okta-jwt)
 
 Add the [JitPack.io](http://jitpack.io) repository to the project `build.grade`:
-```
+```groovy
 repositories {
     maven { url 'https://jitpack.io' }
 }
@@ -42,14 +42,14 @@ repositories {
 
 Then import the latest version in the `build.gradle` of the modules you need:
 
-```
+```groovy
 dependencies {
     implementation 'com.github.lamba92:ktor-okta-jwt:{latest_version}'
 }
 ```
 
 If using Gradle Kotlin DSL:
-```
+```kotlin
 repositories {
     maven(url = "https://jitpack.io")
 }
@@ -59,7 +59,7 @@ dependencies {
 }
 ```
 For Maven:
-```
+```xml
 <repositories>
    <repository>
       <id>jitpack.io</id>
