@@ -1,12 +1,14 @@
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 
 plugins {
-    kotlin("jvm") version "1.3.11"
+    kotlin("jvm") version "1.3.30"
     maven
 }
 
 group = "it.lamba"
 version = "1.0-SNAPSHOT"
+
+val ktorVersion = "1.1.4"
 
 repositories {
     mavenCentral()
@@ -14,17 +16,18 @@ repositories {
 }
 
 dependencies {
-    compile(kotlin("stdlib-jdk8"))
-    compile(ktor("auth"))
-    compile(ktor("auth-jwt"))
-    compile("com.okta.jwt", "okta-jwt-verifier", "0.3.3")
+    implementation(kotlin("stdlib-jdk8"))
+    implementation(ktor("auth"))
+    implementation(ktor("auth-jwt"))
+    implementation(ktor("server-tomcat"))
+    implementation("com.okta.jwt", "okta-jwt-verifier", "0.4.0")
 }
 
 tasks.withType<KotlinCompile> {
     kotlinOptions.jvmTarget = "1.8"
 }
 
-fun DependencyHandler.ktor(module: String, version: String? = null) =
+fun DependencyHandler.ktor(module: String, version: String? = ktorVersion) =
     "io.ktor:ktor-$module:${version?.let { "$version" } ?: "+"}"
 
 val compileKotlin: KotlinCompile by tasks

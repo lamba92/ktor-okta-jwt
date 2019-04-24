@@ -1,107 +1,84 @@
 package it.lamba.ktor.features
 
 import com.okta.jwt.Jwt
-import com.okta.jwt.JwtHelper
-import com.typesafe.config.ConfigFactory
+import com.okta.jwt.JwtVerifiers
 import io.ktor.application.call
 import io.ktor.auth.*
-import io.ktor.config.HoconApplicationConfig
-import io.ktor.http.HttpStatusCode
 import io.ktor.http.auth.HttpAuthHeader
 import io.ktor.request.ApplicationRequest
 import io.ktor.response.respond
-import io.ktor.util.KtorExperimentalAPI
-import java.lang.Exception
+import java.time.Duration
 
-class OktaJwtAuthenticationProvider(name: String?, configuration: Configuration) :
-    AuthenticationProvider(name) {
+private val OktaJWTAuthKey: Any = "OktaJWTAuth"
 
-    data class Configuration(
-        var realm: String = "Ktor Server",
-        var issuerUrl: String = "",
-        var audience: String = "",
-        var connectionTimeout: Int = 1000,
-        var readTimeout: Int = 1000,
-        var clientId: String = ""
-    )
-
-    internal val jwtVerifier = JwtHelper()
-        .applyIf(configuration.issuerUrl.isNotBlank()) {
-            setIssuerUrl(configuration.issuerUrl)
-        }
-        .applyIf(configuration.audience.isNotBlank()) {
-            setAudience(configuration.audience)
-        }
-        .applyIf(configuration.clientId.isNotBlank()) {
-            setClientId(configuration.clientId)
-        }
-        .setConnectionTimeout(configuration.connectionTimeout)
-        .setReadTimeout(configuration.readTimeout)
-        .build()!!
-
-}
-
-@KtorExperimentalAPI
-fun Authentication.Configuration.oktaJWT(
+fun Authentication.Configuration.okta(
+    issuer: String,
+    audience: String,
     name: String? = null,
-    configure: (OktaJwtAuthenticationProvider.Configuration.() -> Unit)? = null
+    configure: OktaJwtVerifierConfiguration.() -> Unit
 ) {
+    val provider = OktaJwtVerifierConfiguration(issuer, audience, name).apply(configure)
 
-    val defaultConfig = OktaJwtAuthenticationProvider.Configuration()
-
-    val hocon = HoconApplicationConfig(ConfigFactory.load())
-
-    hocon.propertyOrNull("okta.audience")?.toString()?.let { defaultConfig.audience = it }
-    hocon.propertyOrNull("okta.issuerUrl")?.toString()?.let { defaultConfig.issuerUrl = it }
-    hocon.propertyOrNull("okta.clientId")?.toString()?.let { defaultConfig.clientId = it }
-    hocon.propertyOrNull("okta.connectionTimeout")?.toString()?.toInt()?.let { defaultConfig.connectionTimeout = it }
-    hocon.propertyOrNull("okta.readTimeout")?.toString()?.toInt()?.let { defaultConfig.readTimeout = it }
-
-    if (configure != null) defaultConfig.apply(configure)
-
-    val provider = OktaJwtAuthenticationProvider(name, defaultConfig)
-
-    provider.pipeline.intercept(AuthenticationPipeline.CheckAuthentication) { context ->
-        val token = context.call.request.jwtToken()
-
-        // TODO i have no idea what to do here... check ktor's JWTAuth.kt
-//        if (token == null) {
-//            context.bearerChallenge(AuthenticationFailedCause.NoCredentials, provider.configuration.realm, provider.schemes)
-//            return@intercept
-//        }
-
-        val decodedToken = try {
-            provider.jwtVerifier.decodeAccessToken(token)!!
-        } catch (e: Exception) {
-            null
+    provider.pipeline.intercept(AuthenticationPipeline.RequestAuthentication) { context ->
+        val token = call.request.parseAuthorizationHeaderOrNull()
+        if (token == null) {
+            context.bearerChallenge(AuthenticationFailedCause.NoCredentials, provider.realm, provider.schemes)
+            return@intercept
         }
-
-        if (decodedToken == null) {
-            context.call.respond(HttpStatusCode.Unauthorized)
-            context.call.authentication
-        } else
-            context.principal(JwtPrincipal(decodedToken))
-
+        try {
+            val principal = OktaPrincipal(provider.underlyingVerifier.decode(token.getBlob(provider.schemes)))
+            context.principal(principal)
+        } catch (cause: Throwable) {
+            val message = cause.message ?: cause.javaClass.simpleName
+            context.error(OktaJWTAuthKey, AuthenticationFailedCause.Error(message))
+        }
     }
-
     register(provider)
 }
 
-internal fun ApplicationRequest.jwtToken(): String? {
-    val parsed = try {
-        parseAuthorizationHeader()
-    } catch (e: Throwable) {
-        null
-    }
-    return if (parsed is HttpAuthHeader.Single && parsed.authScheme.equals("Bearer", ignoreCase = true))
-        parsed.blob
-    else
-        null
+class OktaJwtVerifierConfiguration(issuer: String, audience: String, name: String?) : AuthenticationProvider(name) {
+
+    var connectionTimeout: Long = 1000
+    var readTimeout: Long = 1000
+    var realm: String = "Ktor Server"
+    internal var schemes = JWTAuthSchemes("Bearer")
+
+    internal val underlyingVerifier = JwtVerifiers.accessTokenVerifierBuilder().apply {
+        setIssuer(issuer)
+        setAudience(audience)
+        setConnectionTimeout(Duration.ofMillis(connectionTimeout))
+        setReadTimeout(Duration.ofMillis(readTimeout))
+    }.build()!!
 }
 
-inline class JwtPrincipal(val jwtToken: Jwt) : Principal
+private fun ApplicationRequest.parseAuthorizationHeaderOrNull() = try {
+    parseAuthorizationHeader()
+} catch (ex: IllegalArgumentException) {
+    null
+}
 
-fun AuthenticationContext.jwtPrincipal() = principal<JwtPrincipal>()?.jwtToken
+private fun AuthenticationContext.bearerChallenge(
+    cause: AuthenticationFailedCause,
+    realm: String,
+    schemes: JWTAuthSchemes
+) = challenge(OktaJWTAuthKey, cause) {
+    call.respond(UnauthorizedResponse(HttpAuthHeader.bearerAuthChallenge(realm, schemes)))
+    it.complete()
+}
 
-inline fun <T> T.applyIf(condition: Boolean, block: T.() -> Unit) = if (condition) apply(block) else this
+private fun HttpAuthHeader.Companion.bearerAuthChallenge(realm: String, schemes: JWTAuthSchemes): HttpAuthHeader =
+    HttpAuthHeader.Parameterized(schemes.defaultScheme, mapOf(HttpAuthHeader.Parameters.Realm to realm))
 
+class JWTAuthSchemes(val defaultScheme: String, vararg additionalSchemes: String) {
+    val schemes = (arrayOf(defaultScheme) + additionalSchemes).toSet()
+    val schemesLowerCase = schemes.map { it.toLowerCase() }.toSet()
+
+    operator fun contains(scheme: String): Boolean = scheme.toLowerCase() in schemesLowerCase
+}
+
+private fun HttpAuthHeader.getBlob(schemes: JWTAuthSchemes) = when {
+    this is HttpAuthHeader.Single && authScheme.toLowerCase() in schemes -> blob
+    else -> null
+}
+
+class OktaPrincipal(parsedToken: Jwt) : Principal
